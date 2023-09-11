@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Видео с демонстрацией экрана</title>
+</head>
+<body>
+    <h1>Видео с демонстрацией экрана</h1>
+    
+    <video id="screen" autoplay></video>
+    <button id="startSharing">Начать демонстрацию экрана</button>
+
+    <script>
+        const screenVideo = document.getElementById('screen');
+        const startSharingButton = document.getElementById('startSharing');
+
+        let mediaSource = null;
+        let sourceBuffer = null;
+        let mediaChunks = [];
+
+        async function startScreenSharing() {
+            try {
+                const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+
+                // Создаем MediaSource и устанавливаем его как источник для видео элемента
+                mediaSource = new MediaSource();
+                screenVideo.src = URL.createObjectURL(mediaSource);
+
+                mediaSource.addEventListener('sourceopen', () => {
+                    // Создаем и добавляем SourceBuffer
+                    sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="vp8"'); // Укажите правильный тип и кодек
+                });
+
+                stream.oninactive = () => {
+                    if (mediaSource.readyState === 'open') {
+                        mediaSource.endOfStream();
+                    }
+                };
+
+                const mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        mediaChunks.push(event.data);
+
+                        if (sourceBuffer && sourceBuffer.updating === false) {
+                            // Если SourceBuffer готов, добавляем данные
+                            const chunk = mediaChunks.shift();
+                            sourceBuffer.appendBuffer(chunk);
+                        }
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    if (mediaSource.readyState === 'open') {
+                        mediaSource.endOfStream();
+                    }
+                };
+
+                mediaRecorder.start();
+            } catch (error) {
+                console.error('Ошибка при захвате экрана:', error);
+            }
+        }
+
+        startSharingButton.addEventListener('click', () => {
+            startScreenSharing();
+        });
+    </script>
+</body>
+</html>

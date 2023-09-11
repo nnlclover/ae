@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket Video Viewer</title>
+</head>
+
+<body>
+    <h1>WebSocket Video Viewer</h1>
+
+    <video id="videoPlayer" autoplay></video>
+
+    <script>
+        const videoPlayer = document.getElementById('videoPlayer');
+        const mediaSource = new MediaSource();
+
+        // Создайте URL для MediaSource и установите его как источник для видео элемента
+        videoPlayer.src = URL.createObjectURL(mediaSource);
+
+        // Обработчик для MediaSource, который будет получать видео-буфер и добавлять его в SourceBuffer
+        mediaSource.addEventListener('sourceopen', () => {
+            const sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="vp8"'); // Укажите правильный тип и кодек
+
+            // Создайте веб-сокет соединение (замените URL на ваш адрес веб-сокет сервера)
+            const socket = new WebSocket('ws://localhost:3001');
+
+            socket.onmessage = (event) => {
+                // Получите данные с веб-сокета
+                const videoBuffer = event.data; // Предполагается, что данные посылаются в виде Blob или ArrayBuffer
+
+                // Обработка буфера видео и добавление его в SourceBuffer
+                sourceBuffer.addEventListener('updateend', () => {
+                    if (videoBuffer.length > 0) {
+                        sourceBuffer.appendBuffer(videoBuffer);
+                    } else {
+                        mediaSource.endOfStream(); // Завершите поток после загрузки всего буфера
+                    }
+                });
+            };
+
+            socket.onclose = () => {
+                console.log('Соединение с веб-сокетом закрыто');
+            };
+
+            socket.onerror = (error) => {
+                console.error('Ошибка веб-сокета:', error);
+            };
+        });
+
+    </script>
+</body>
+
+</html>

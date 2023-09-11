@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Трансляция экрана и запись</title>
+
+    <style>
+        .vid {
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Трансляция экрана и запись</h1>
+
+    <video id="screen" class="vid" autoplay></video>
+    <button id="startRecord">Начать запись</button>
+    <button id="stopRecord">Остановить запись</button>
+
+    <script>
+        let mediaRecorder;
+        let mediaStream;
+        const screenVideo = document.getElementById('screen');
+        const startButton = document.getElementById('startRecord');
+        const stopButton = document.getElementById('stopRecord');
+        const socket = new WebSocket('ws://localhost:3000'); // Адрес вашего WebSocket сервера
+
+        function resizeVideoToWindowSize() {
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            screenVideo.width = windowWidth;
+            screenVideo.height = windowHeight;
+        }
+
+        resizeVideoToWindowSize();
+
+        window.addEventListener('resize', resizeVideoToWindowSize);
+
+        startButton.addEventListener('click', async () => {
+            mediaStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            screenVideo.srcObject = mediaStream;
+            mediaRecorder = new MediaRecorder(mediaStream);
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    // Отправляем чанки на сервер через WebSocket
+                    socket.send(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                console.log('Запись завершена');
+            };
+
+            mediaRecorder.start();
+        });
+
+        stopButton.addEventListener('click', () => {
+            mediaRecorder.stop();
+            screenVideo.srcObject = null;
+            mediaStream.getTracks().forEach(track => track.stop());
+        });
+
+        socket.addEventListener('open', (event) => {
+            console.log('WebSocket соединение установлено');
+        });
+
+        socket.addEventListener('close', (event) => {
+            console.log('WebSocket соединение закрыто');
+        });
+
+        socket.addEventListener('error', (event) => {
+            console.error('Произошла ошибка WebSocket:', event);
+        });
+    </script>
+</body>
+</html>
